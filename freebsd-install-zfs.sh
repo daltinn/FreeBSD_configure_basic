@@ -31,12 +31,10 @@ if [ "$d1" == "" ]; then
   echo "enter name disk 1 (eg ada0, da0)"
 read d1
 fi
-
 if [ "$d2" == "" ] && [ "$mirror" -ge "1" ] ; then 
   echo "enter name disk 2 (eg ada0, da0)"
 read d2
 fi
-
 if [ "$d3" == "" ] && [ "$mirror" -ge "2" ] ; then 
   echo "enter name disk 3 (eg ada0, da0)"
 read d3
@@ -55,7 +53,6 @@ if [ "$swap" == "" ]; then
   echo "enter swap (eg. 8G), enter for swap 16G"
 read swap
 fi
-
 if [ "$swap" == "" ]; then 
   swap=16G
   echo "swap=$swap"
@@ -68,7 +65,6 @@ if [ "$tank" == "" ]; then
   echo "pool name: $tank"
 fi
 tank_root=$tank/sys
-
 echo "pool name: $tank" 		#debug
 
 if [ "$hostname" == "" ]; then 
@@ -162,16 +158,18 @@ sysctl kern.geom.debugflags=0x10
 
 #zpool destroy $tank
 
+#create zpool (need rewrite without gnop)
+
 if [ "$mirror" == "2" ];  then 
-		zpool create -f $tank raidz /dev/gpt/"${dsk_label}"_"${d1}".nop /dev/gpt/"${dsk_label}"_"${d2}".nop /dev/gpt/"${dsk_label}"_"${d3}".nop
+		zpool create -m none -f $tank raidz /dev/gpt/"${dsk_label}"_"${d1}".nop /dev/gpt/"${dsk_label}"_"${d2}".nop /dev/gpt/"${dsk_label}"_"${d3}".nop
 	elif [ "$mirror" == "1" ];  then 
-		zpool create  -f $tank mirror /dev/gpt/"${dsk_label}"_"${d1}".nop /dev/gpt/"${dsk_label}"_"${d2}".nop
+		zpool create -m none -f $tank mirror /dev/gpt/"${dsk_label}"_"${d1}".nop /dev/gpt/"${dsk_label}"_"${d2}".nop
 	elif [ "$mirror" == "0" ];  then
-		zpool create  -f $tank /dev/gpt/"${dsk_label}"_"${d1}".nop
+		zpool create -m none -f $tank /dev/gpt/"${dsk_label}"_"${d1}".nop
 	else
 		echo "error mirror option"
 fi
-zfs set mountpoint=none $tank
+#zfs set mountpoint=none $tank
 
 zpool export $tank
 for disk in $d1 $d2 $d3 ;
@@ -183,11 +181,9 @@ zpool import $tank
 
 zpool status #debug
 
-#mkdir /var/mnt
-#zfs set checksum=fletcher4                                      								$tank		#check 
 zfs set atime=off $tank
 
-zfs create -V $swap -o org.freebsd:swap=on -o checksum=off -o sync=disabled -o primarycache=none $tank/swap  #-o secondarycache=none
+zfs create -V $swap -o org.freebsd:swap=on -o checksum=off -o sync=disabled -o primarycache=none volblocksize=4k $tank/swap  #-o secondarycache=none
 
 #			mountpiont					compression	exec		setuid		quota		reservation	
 zfs create 																									$tank_root
@@ -197,10 +193,9 @@ zfs create -o mountpoint=none																	$tank_root/pkg
 zfs create -o mountpoint=none																	$tank_root/dist
 zfs create -o mountpoint=none																	$tank_root/dist/usr
 zfs create 																									$tank/data
-#read QQ
 
 zfs create 																-o quota=8G											$tank_root/base/ROOT
-zfs create -o mountpoint=/var/mnt	-o copies=2					-o quota=4G	-o reservation=1G				$tank_root/base/ROOT/default				#root folder
+zfs create -o mountpoint=/var/mnt	-o copies=2					-o quota=4G	-o reservation=1G	-o recordsize=128k			$tank_root/base/ROOT/default				#root folder
 zfs create -o mountpoint=/var/mnt/usr                          			-o quota=8G	-o reservation=4G				$tank_root/base/usr 
 zfs create -o mountpoint=/var/mnt/var                           -o quota=12G	-o reservation=2G			$tank_root/base/var #may be -o canmount=off
 zfs create -o compression=lz4  -o exec=off     -o setuid=off   												$tank_root/base/var/crash
@@ -211,7 +206,6 @@ zfs create -o compression=lz4  -o exec=off     -o setuid=off   -o quota=2G      
 zfs create -o compression=lz4  -o exec=off     -o setuid=off   			                         			$tank_root/base/var/audit
 zfs create                      -o exec=off     -o setuid=off												$tank_root/base/var/empty
 zfs create -o compression=lz4  -o exec=off     -o setuid=off   -o quota=4G	-o reservation=1G				$tank_root/base/var/log
-#read QQ
 zfs create -o compression=lz4  -o exec=on      -o setuid=off   -o quota=8G	-o reservation=1G				$tank_root/base/tmp						#???????
 zfs create -o compression=gzip  -o exec=off     -o setuid=off												$tank_root/base/var/mail							#check hierarhy
 
@@ -263,24 +257,31 @@ echo "freebsd instaled"
 # install base configs
 cat << EOF > /var/mnt/etc/rc.conf
 zfs_enable="YES"
+
+sshd_enable="YES"
+ntpd_enable="YES"
+ntpd_sync_on_start="YES"
+#ntpd_program="/usr/sbin/ntpd"   
+#ntpd_flags="-p /var/run/ntpd.pid -f /var/db/ntpd.drift"
+EOF
+echo "rc.conf created"
+
+cat << EOF > /var/mnt/etc/rc.conf.local
 hostname="$hostname"
 #defaultrouter=""
 ifconfig_$iface="DHCP"
 
 #cloned_interfaces="lagg0"
+#ifconfig_igb0="up"
+#ifconfig_igb1="up"
 #ifconfig_lagg0="laggproto lacp laggport igb0 laggport igb1 192.168.0.2/24"
-
-sshd_enable="YES"
-ntpd_enable="YES"
-ntpd_sync_on_start="YES"
-
 EOF
-#ntpd_program="/usr/sbin/ntpd"   
-#ntpd_flags="-p /var/run/ntpd.pid -f /var/db/ntpd.drift"
-echo "rc.conf created"
+echo "rc.conf.local created"
+
 cat << EOF > /var/mnt/boot/loader.conf
 zfs_load="YES"
-vfs.root.mountfrom="zfs:$tank_root/base/ROOT/default"
+#vfs.root.mountfrom="zfs:$tank_root/base/ROOT/default"
+
 #boot speedup
 hw.memtest.tests=0
 
@@ -314,6 +315,7 @@ hw.em.rx_abs_int_delay=1000
 hw.em.tx_abs_int_delay=1000
 EOF
 echo "loader.conf created"
+
 cat << EOF > /var/mnt/etc/make.conf
 WITHOUT_X11=YES
 #multithread build ports
@@ -329,6 +331,7 @@ WITHOUT_X11=YES
 #.endif
 EOF
 echo "make.conf created"
+
 cat << EOF > /var/mnt/etc/sysctl.conf
 #zfs
 kern.maxvnodes=500000
@@ -352,6 +355,7 @@ net.inet.ip.intr_queue_maxlen=500
 net.inet.ip.portrange.reservedhigh=0
 EOF
 echo "sysctl.conf created"
+
 mkdir /var/mnt/etc/periodic/hourly
 cat << EOF > /var/mnt/etc/periodic/hourly/000.zfs-snapshot
 #!/bin/sh
@@ -383,6 +387,7 @@ case "$hourly_zfs_snapshot_enable" in
         ;;
 esac
 EOF
+
 #cat << EOF > /var/mnt/
 
 cp /var/mnt/usr/share/zoneinfo/$tz /var/mnt/etc/localtime
@@ -392,17 +397,16 @@ zfs set readonly=on $tank_root/base/var/empty
 
 touch /var/mnt/etc/fstab
 
-cat /var/mnt/etc/rc.conf
+#cat /var/mnt/etc/rc.conf
 
 export LD_LIBRARY_PATH=/mnt2/lib
 echo -n "unmount?"
 
-cd /
+cd /tmp
 
 cp /boot/zfs/zpool.cache /var/mnt/boot/zfs/zpool.cache
 zpool set bootfs=$tank_root/base/ROOT/default $tank
 
-cd /tmp
 sleep 3
 zfs unmount -a
 
@@ -423,4 +427,4 @@ zfs set mountpoint=/var/db/portsnap $tank_root/pkg/var/db/portsnap
 
 #zfs set mountpoint=/etc $tank_root/etc
 
-echo "#All done" 
+echo "######All done" 
