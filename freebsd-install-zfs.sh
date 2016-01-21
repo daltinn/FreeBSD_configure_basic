@@ -142,6 +142,7 @@ do (
 	if [ "$CONFIRM" == "n" ]; then
 		exit
 	fi
+	if [ "$CONFIRM" == "y" ]; then
 		gpart destroy -F $disk
 		gpart create -s gpt $disk
 		gpart add -b 40 -s 984 -t freebsd-boot $disk
