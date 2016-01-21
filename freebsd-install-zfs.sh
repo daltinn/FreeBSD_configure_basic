@@ -152,39 +152,13 @@ do (
 done
 
 gpart show -l
-#read QQ
 
-#gpart destroy -F $d1
-#gpart status
-#gpart create -s gpt $d1
-#gpart add -b 40 -s 64k -t freebsd-boot $d1
-##gpart add -s 16G -t freebsd-swap -l swap0 ad6
-#gpart add -t freebsd-zfs -l disk0 $d1
-#gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $d1
-
-#if [ "$mirror" -ge "1" ]; then
-#  gpart destroy -F $d2
-#  gpart create -s gpt $d2
-#  gpart add -b 40 -s 64k -t freebsd-boot $d2
-#  gpart add -t freebsd-zfs -l disk1 $d2
-#  gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $d2
-#fi
-
-#if [ "$mirror" == "2" ]; then
-#  gpart destroy -F $d3
-#  gpart create -s gpt $d3
-#  gpart add -b 40 -s 64k -t freebsd-boot $d3
-#  gpart add -t freebsd-zfs -l disk2 $d3
-#  gpart bootcode -b /boot/pmbr -p /boot/gptzfsboot -i 1 $d3
-#fi
-
-#rewrite with mount unionfs
+#Need rewrite with mount unionfs
 mdconfig -a -t swap -s 16M
 newfs /dev/md2
 mount /dev/md2 /boot/zfs
 sysctl kern.geom.debugflags=0x10
 
-#read QQ
 #zpool destroy $tank
 
 if [ "$mirror" == "2" ];  then 
@@ -209,7 +183,6 @@ zpool import $tank
 zpool status #debug
 
 #mkdir /var/mnt
-#read QQ
 #zfs set checksum=fletcher4                                      								$tank		#check 
 zfs set atime=off $tank
 
@@ -252,13 +225,11 @@ zfs create -o compression=off  -o exec=off	-o setuid=off													$tank_root/
 zfs create -o mountpoint=/var/mnt/var/db/pkg -o compression=lz4  -o exec=on      -o setuid=off  		-p	$tank_root/pkg/var/db/pkg
 zfs create -o mountpoint=/var/mnt/var/db/ports -o compression=lz4  -o exec=on      -o setuid=off  			$tank_root/pkg/var/db/ports
 zfs create -o mountpoint=/var/mnt/var/db/portsnap -o compression=lz4  -o exec=on      -o setuid=off  		$tank_root/pkg/var/db/portsnap
-#read QQ
 
 zfs list
-#read QQ
 mount
 
-#zfs create -o compression=lz4	-o copies=2 	-o quota=100M -o reservation=20M $tank_root/etc  #TEST!!!!
+#zfs create -o compression=lz4	-o copies=2 	-o quota=100M -o reservation=20M $tank_root/etc  #TEST not avaliable mount /etc on boot
 
 zfs create                                                      											$tank/home
 cd /var/mnt/ ; 
@@ -275,9 +246,7 @@ zfs create 																									$tank/data/db/mysql/innodb-log
 
 zfs create -o recordsize=8k                                                                                                     $tank/data/db/postgresql
 
-#read QQ
 zfs list
-#read QQ
 echo "instaling FreeBSD"
 ######## install base system
 cd /usr/freebsd-dist 
@@ -415,7 +384,6 @@ esac
 EOF
 #cat << EOF > /var/mnt/
 
-
 cp /var/mnt/usr/share/zoneinfo/$tz /var/mnt/etc/localtime
 cp /boot/zfs/zpool.cache /var/mnt/boot/zfs/zpool.cache
 
@@ -432,7 +400,6 @@ cd /
 
 cp /boot/zfs/zpool.cache /var/mnt/boot/zfs/zpool.cache
 zpool set bootfs=$tank_root/base/ROOT/default $tank
-
 
 cd /tmp
 sleep 3
@@ -452,8 +419,6 @@ zfs set mountpoint=/usr/local $tank_root/pkg/usr/local
 zfs set mountpoint=/var/db/pkg $tank_root/pkg/var/db/pkg
 zfs set mountpoint=/var/db/ports $tank_root/pkg/var/db/ports
 zfs set mountpoint=/var/db/portsnap $tank_root/pkg/var/db/portsnap
-
-
 
 #zfs set mountpoint=/etc $tank_root/etc
 
